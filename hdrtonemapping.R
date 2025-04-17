@@ -3,6 +3,7 @@
 # https://www.overfitting.net/
 
 library(tiff)  # save 16-bit TIFF's
+library(terra)
 library(png)  # save 8-bit PNG's
 
 
@@ -33,12 +34,28 @@ contrast=function(x, a=0.5, b=0.5, m=0, E=2) {
 
 
 #################################################
+# 1. APPLY SIMPLE CONTRAST CURVE 
 
-img=readTIFF("tiovivo.tif")
+# Linear RAW development: dcraw -v -w -4 -T tiovivo.DNG
+# resized to 1280x852 px
+img=readTIFF("tiovivo.tif")^(1/2.2)  # read image and delinearize with 2.2 gamma
+hist(img, breaks=500, xlim=c(0,1))
 a=median(img)
 b=a
-hist(img, breaks=800, xlim=c(0,1))
+m=0.1
+E=2.5
 abline(v=a, col='red')
 
-writeTIFF(contrast(img, a, b, m=0.2),
-          "tiovivo_contrast.tif", bits.per.sample=16)
+imgcontrast=contrast(img, a, b, m, E)
+acontrast=median(img)
+paste0("Before/after median is preserved: ",
+       round(a,5), " -> ", round(acontrast,5))
+hist(imgcontrast, breaks=800, xlim=c(0,1))
+abline(v=median(imgcontrast), col='red')
+writeTIFF(imgcontrast, "tiovivocontrast.tif", bits.per.sample=16)
+
+
+
+
+
+

@@ -39,8 +39,8 @@ contrast=function(x, a=0.5, b=0.5, m=0, E=2) {
 # Linear RAW development: dcraw -v -w -4 -T tiovivo.DNG
 # resized to 1280x852 px
 img=readTIFF("tiovivo.tif")^(1/2.2)  # read image and delinearize with 2.2 gamma
-hist(img, breaks=500, xlim=c(0,1))
-a=median(img)
+hist(img, breaks=800, xlim=c(0,1), ylim=c(0,14000))
+a=median(img)  # turning point applied on median to maximize contrast split
 b=a
 m=0.1
 E=2.5
@@ -50,7 +50,7 @@ imgcontrast=contrast(img, a, b, m, E)
 acontrast=median(img)
 paste0("Before/after median is preserved: ",
        round(a,5), " -> ", round(acontrast,5))
-hist(imgcontrast, breaks=800, xlim=c(0,1))
+hist(imgcontrast, breaks=800, xlim=c(0,1), ylim=c(0,14000))
 abline(v=median(imgcontrast), col='red')
 writeTIFF(imgcontrast, "tiovivocontrast.tif", bits.per.sample=16)
 

@@ -47,11 +47,11 @@ E=2.5
 abline(v=a, col='red')
 
 imgcontrast=contrast(img, a, b, m, E)
-acontrast=median(img)
+acontrast=median(imgcontrast)
 paste0("Before/after median is preserved: ",
-       round(a,5), " -> ", round(acontrast,5))
+       round(a,4), " -> ", round(acontrast,4))
 hist(imgcontrast, breaks=800, xlim=c(0,1), ylim=c(0,14000))
-abline(v=median(imgcontrast), col='red')
+abline(v=acontrast, col='red')
 writeTIFF(imgcontrast, "tiovivocontrast.tif", bits.per.sample=16)
 
 

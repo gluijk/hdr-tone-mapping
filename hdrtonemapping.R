@@ -80,8 +80,32 @@ arrayblur=function(img, radius=10, kernel='gaussian', fun='mean') {
 }
 
 
+solid=function(DEM, altitude=0, isnan=0) {
+    # solid() calculates a solid version of a DEM
+    #
+    # altitude: DEM altitude level contour
+    # isnan: value assigned to NaN data
+    
+    DIMY=nrow(DEM)
+    DIMX=ncol(DEM)
+    
+    # If array turn its first dimension into a genuine matrix
+    if (!is.matrix(DEM)) {
+        print("WARNING: input DEM is not a matrix but an array. First dimension is used")
+        DEM=matrix(DEM[,,1], nrow=DIMY, ncol=DIMX)
+    }
+    DEM[is.nan(DEM)]=isnan
+    
+    # Calculate solid map from DEM
+    solidmap=DEM*0
+    solidmap[DEM > altitude]=1
+    
+    return(solidmap)
+}
+
+
 #################################################
-# 1. APPLY SIMPLE CONTRAST CURVE 
+# 1. SIMPLE CONTRAST CURVE 
 
 # Linear RAW development: dcraw -v -w -4 -T tiovivo.DNG
 # resized to 1280x852 px
@@ -102,33 +126,100 @@ abline(v=acontrast, col='red')
 writeTIFF(imgcontrast, "tiovivocontrast.tif", bits.per.sample=16)
 
 
+
+###########################################################
+# ENHANCED DEM (REM) THROUGH HDR TONE MAPPING
+
+###########################################################
+
+# 2. READ DEM 
+
+# https://data.humdata.org/dataset/worldpop-population-density-for-spain
+peninsula=rast("gebco_2024_n45.8569_s34.2114_w-11.5137_e5.2295.tif")
+peninsula
+plot(peninsula)
+RESOLUTION=res(peninsula)[1]  # 0.004167 degrees resolution
+
+# REPROJECT raster from Longitude Latitude (+proj=longlat)/WGS84
+# to Lambert Conic Conformal (+proj=lcc)/WGS84
+# by default crs="+proj=lcc +ellps=WGS84 +lat_1=33 +lat_2=45 +lon_0=0"
+# CRS="+proj=lcc +ellps=WGS84 +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=0 +units=km"  # default
+# CRS="+proj=lcc +ellps=WGS84 +lat_1=37 +lat_2=43 +lat_0=40 +lon_0=-3 +units=km"  # better for Peninsula
+# CRS="+proj=lcc +ellps=WGS84 +lat_1=30 +lat_2=44 +lat_0=37 +lon_0=-3 +units=km"  # better for Spain incl. Canarias
+# CRS="+proj=merc +ellps=WGS84 +datum=WGS84 +units=km"  # Mercator for Spain incl. Canarias
+CRS="+proj=lcc +ellps=WGS84 +lat_1=37 +lat_2=43 +lat_0=40 +lon_0=-3.141667 +units=km"  # better for Peninsula
+
+peninsula=project(x=peninsula, y=CRS, threads=TRUE)
+peninsula
+plot(peninsula)
+abline(h=0, v=0)  # centre of reference
+RESOLUTION=res(peninsula)[1]  # 0.392 km resolution
+
+# CROP raster to drop NaN's
+cropdef=ext(-659, 659, -600, 600)
+peninsulacrop=crop(x=peninsula, y=cropdef)
+peninsulacrop
+plot(peninsulacrop)
+abline(h=0, v=0)  # centre of reference
+
+# RESAMPLE raster to Full HD
+# DIMY=1080
+DIMX=1920
+DIMY=round(DIMX*nrow(peninsulacrop)/ncol(peninsulacrop))  # 1748 px
+peninsulars=rast(nrows=DIMY, ncols=DIMX, extent=ext(peninsulacrop))
+peninsulars=resample(x=peninsulacrop, y=peninsulars, method='bilinear', threads=TRUE)
+plot(peninsulars)
+abline(h=0, v=0)  # centre of reference
+RESOLUTION=res(peninsulars)[1]  # 0.686 km resolution
+
+
+###########################################################
+
+# 3. CONVERT TO MATRIX AND CALCULATE SOLID AND CONTOUR
+
+# Convert to matrix and save as TIFF
+# DEM=matrix(as.array(peninsulars), nrow=nrow(peninsulars))
+DEM=as.matrix(peninsulars, wide=TRUE)  # no need to use as.array()
+hist(DEM, breaks=1000)
+DEM[DEM < 0]=0
+writeTIFF((DEM/max(DEM))^(1/2.2), "peninsuladem.tif", bits.per.sample=16, compression='LZW')
+
+# Solid map for masking in Photoshop
+DEMsolid=solid(DEM)
+writeTIFF(DEMsolid, "peninsulasolid.tif", compression='LZW')
+
+
 #################################################
-# 2. BASIC TONE MAPPING
+# 4. BASIC TONE MAPPING
 
 # Create blurred version
-DEM=readTIFF("tiovivo.tif")^(1/2.2)  # read image and delinearize with 2.2 gamma
-DEM=readTIFF("room.tif")  # read image
-DEM=readTIFF("peninsuladem.tif")  # read image
-# DEMblur=0.299*DEM[,,1]+0.587*DEM[,,2]+0.114*DEM[,,3]  # B&W blur
-DEMblur=DEM
-DEMblur=arrayblur(DEMblur, radius=80)
-writeTIFF(DEMblur, "DEMblur.tif", bits.per.sample=16)
+name="peninsuladem"  # "room", "tiovivo"
+name="room"  # "room", "tiovivo"
+gamma=1  # 2.2 for RAW development
+DEM=readTIFF(paste0(name, ".tif"))^(1/gamma)  # read image
+if (length(dim(DEM))==2) {  # B&W image
+        DEMblur=DEM
+    } else {  # colour image
+        DEMblur=0.299*DEM[,,1]+0.587*DEM[,,2]+0.114*DEM[,,3]  # B&W blur
+    }
+DEMblur=arrayblur(DEMblur, radius=80)  # takes time...
+writeTIFF(DEMblur, paste0("DEMblur_", name, ".tif"), bits.per.sample=16)
+
 
 # Tone mapping (looped version)
 
 # Reduce global contrast (static curve 1)
 a1=0.5  # median(DEM[DEM>0 & DEM<1])  # 0.5
 b1=0.5
-m1=0.2
-E1=0.2  # 0.7
+m1=0
+E1=0  # 0.7
 # Increase local contrast (adaptive curve 2)
-m2=0.3
-E2=4  # 1.2
-DEMtonemap=DEM*0
+m2=0
+E2=5  # 1.2
 
 
 # Draw Tone mapping curve set
-png("tonemappingcurveset.png", width=800, height=800)
+png("tonemappingcurveset.png", width=874, height=874)
 x=seq(0, 1, 0.001)
 y=contrast(x, a1, b1, m1, E1)
 plot(x, y, type='l', asp=1, xlim=c(0,1), ylim=c(0,1),
@@ -151,24 +242,24 @@ axis(1, at=c(0, 0.5, 1))
 axis(2, at=c(0, 0.5, 1))
 dev.off()
 
-
-# If colour image
-for (i in 1:nrow(DEM)) {
-    for (j in 1:ncol(DEM)) {
-        a2=DEMblur[i,j]
-        b2=contrast(a2, a1, b1, m1, E1)
-        DEMtonemap[i,j,]=contrast(DEM[i,j,], a2, b2, m2, E2)
+# Generate output tone mapped image
+DEMtonemap=DEM*0
+if (length(dim(DEM))==2) {  # B&W image
+    for (i in 1:nrow(DEM)) {
+        for (j in 1:ncol(DEM)) {
+            a2=DEMblur[i,j]
+            b2=contrast(a2, a1, b1, m1, E1)
+            DEMtonemap[i,j]=contrast(DEM[i,j], a2, b2, m2, E2)
+        }
+    }
+} else {  # colour image
+    for (i in 1:nrow(DEM)) {
+        for (j in 1:ncol(DEM)) {
+            a2=DEMblur[i,j]
+            b2=contrast(a2, a1, b1, m1, E1)
+            DEMtonemap[i,j,]=contrast(DEM[i,j,], a2, b2, m2, E2)
+        }
     }
 }
-writeTIFF(DEMtonemap, "DEMtonemap_room.tif", bits.per.sample=16)
+writeTIFF(DEMtonemap, paste0("DEMtonemap_", name, ".tif"), bits.per.sample=16)
 
-
-# If B&W image
-for (i in 1:nrow(DEM)) {
-    for (j in 1:ncol(DEM)) {
-        a2=DEMblur[i,j]
-        b2=contrast(a2, a1, b1, m1, E1)
-        DEMtonemap[i,j]=contrast(DEM[i,j], a2, b2, m2, E2)
-    }
-}
-writeTIFF(DEMtonemap, "DEMtonemap_DEM.tif", bits.per.sample=16)

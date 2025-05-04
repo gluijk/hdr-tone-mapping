@@ -2,3 +2,5 @@
 Basic HDR tone mapping algorithm using contrast (sigmoid) curves
 
 ![hdr-tone-mapping](/tiovivocontrast.jpg)
+
+![hdr-tone-mapping](/peninsulademtonemappingcolor.gif)

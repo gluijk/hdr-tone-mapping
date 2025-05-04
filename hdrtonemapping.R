@@ -194,7 +194,6 @@ writeTIFF(DEMsolid, "peninsulasolid.tif", compression='LZW')
 
 # Create blurred version
 name="peninsuladem"  # "room", "tiovivo"
-name="room"  # "room", "tiovivo"
 gamma=1  # 2.2 for RAW development
 DEM=readTIFF(paste0(name, ".tif"))^(1/gamma)  # read image
 if (length(dim(DEM))==2) {  # B&W image

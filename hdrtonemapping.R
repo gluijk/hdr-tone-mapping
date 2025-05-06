@@ -7,21 +7,6 @@ library(terra)
 library(png)  # save 8-bit PNG's
 
 
-colourmatrix=function(img, colour=c(0.75, 0.5, 0.25), gamma=1) {
-    # img must be a grayscale matrix
-    
-    # Gamma is applied before colouring
-    img=replicate(3, img^(1/gamma))
-    
-    # Now the middle gray (0.5) becomes colour[]
-    colour[colour<0.01]=0.01  # clip very low/high values
-    colour[colour>0.99]=0.99
-    colourgamma=log(0.5)/log(colour)
-    for (i in 1:3) img[,,i]=img[,,i]^(1/colourgamma[i])
-
-    return(img)
-}
-
 contrast=function(x, a=0.5, b=0.5, m=0, E=2) {
     if (a==0 | a==1) {  # if x=0 or x=1 the identity function is applied
         return(x)
@@ -35,21 +20,6 @@ contrast=function(x, a=0.5, b=0.5, m=0, E=2) {
         )
     }
 }
-
-# Resample
-arrayresample=function(img, DIMX, DIMY, method='bilinear') {
-    # method=c('near', 'bilinear', 'cubic', 'cubicspline', 'lanczos')
-    
-    require(terra)
-    
-    raster=rast(img)
-    rasterrs=rast(nrows=round(DIMY), ncols=round(DIMX), extent=ext(raster))
-    rasterrs=resample(raster, rasterrs, method=method, threads=TRUE)
-    
-    if (is.matrix(img)) return (matrix(as.array(rasterrs), nrow=nrow(rasterrs)))    
-    return (as.array(rasterrs))  # convert back to matrix/array
-}
-
 
 # Blur
 # https://stackoverflow.com/questions/70429190/how-can-i-perform-neighborhood-analysis-in-terra-or-raster-and-keep-the-same-na
@@ -261,4 +231,26 @@ if (length(dim(DEM))==2) {  # B&W image
     }
 }
 writeTIFF(DEMtonemap, paste0("DEMtonemap_", name, ".tif"), bits.per.sample=16)
+
+
+#################################################
+# 5. 3D MESHES
+
+z <- readTIFF("peninsuladem.tif")^2.2  # undo gamma 2.2
+z <- readTIFF("DEMtonemap_peninsuladem.tif")^2.2  # undo gamma 2.2
+z[z==0]=NA
+
+# Create x and y coordinate sequences
+x <- 1:nrow(z)
+y <- 1:ncol(z)
+
+# Create 3D mesh plot
+persp(x, y, z,
+      theta = 90, phi = 45,      # viewing angles
+      expand = 0.01,  # 0.5,              # vertical exaggeration
+      col = "lightblue",         # color of surface
+      shade = 0.5,               # shading
+      border = NA,               # remove borders for a smooth look
+      axes = FALSE,
+      xlab = "", ylab = "", zlab = "")     # axes ticks
 

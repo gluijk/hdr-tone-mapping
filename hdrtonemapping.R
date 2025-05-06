@@ -188,7 +188,7 @@ E2=5  # 1.2
 
 
 # Draw Tone mapping curve set
-png("tonemappingcurveset.png", width=874, height=874)
+png("tonemappingcurveset.png", width=512, height=512)
 x=seq(0, 1, 0.001)
 y=contrast(x, a1, b1, m1, E1)
 plot(x, y, type='l', asp=1, xlim=c(0,1), ylim=c(0,1),

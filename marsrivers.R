@@ -21,20 +21,6 @@ contrast=function(x, a=0.5, b=0.5, m=0, E=2) {
     }
 }
 
-# Resample
-arrayresample=function(img, DIMX, DIMY, method='bilinear') {
-    # method=c('near', 'bilinear', 'cubic', 'cubicspline', 'lanczos')
-    
-    require(terra)
-    
-    raster=rast(img)
-    rasterrs=rast(nrows=round(DIMY), ncols=round(DIMX), extent=ext(raster))
-    rasterrs=resample(raster, rasterrs, method=method, threads=TRUE)
-    
-    if (is.matrix(img)) return (matrix(as.array(rasterrs), nrow=nrow(rasterrs)))    
-    return (as.array(rasterrs))  # convert back to matrix/array
-}
-
 # Blur
 # https://stackoverflow.com/questions/70429190/how-can-i-perform-neighborhood-analysis-in-terra-or-raster-and-keep-the-same-na
 arrayblur=function(img, radius=10, kernel='gaussian', fun='mean') {
@@ -67,7 +53,6 @@ arrayblur=function(img, radius=10, kernel='gaussian', fun='mean') {
 ###########################################################
 # ENHANCED DEM (REM) THROUGH HDR TONE MAPPING
 
-###########################################################
 
 # 1. READ DEM 
 

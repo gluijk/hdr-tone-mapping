@@ -27,13 +27,14 @@ arrayblur=function(img, radius=10, kernel='gaussian', fun='mean') {
     # radius: radius of the averaging window
     # kernel: 'gaussian', 'spherical'. Otherwise all 1's
     
-    require(terra)
+    require(terra)  # filtering with focal()
+    require(png)  # to save kernel as PNG
     
     # Build circular kernel
     D=2*radius+1  # D will always be an odd number as required by focal()
-    sigma=radius/3  # keep gaussian shape for every radius
     w=matrix(1, nrow=D, ncol=D)
     if (kernel=='gaussian') {  # gaussian filter
+        sigma=radius/3  # keep gaussian shape for every radius
         w=exp(-((row(w)-(radius+1))^2 + (col(w)-(radius+1))^2) / (2 * sigma^2))
     } else if (kernel=='spherical') {  # spherical filter
         w=1 - ((row(w)-(radius+1))^2 + (col(w)-(radius+1))^2) / (radius+1)^2        

@@ -27,14 +27,13 @@ arrayblur=function(img, radius=10, kernel='gaussian', fun='mean') {
     # radius: radius of the averaging window
     # kernel: 'gaussian', 'spherical'. Otherwise all 1's
     
-    require(terra)  # filtering with focal()
-    require(png)  # to save kernel as PNG
+    require(terra)
     
     # Build circular kernel
     D=2*radius+1  # D will always be an odd number as required by focal()
+    sigma=radius/3  # keep gaussian shape for every radius
     w=matrix(1, nrow=D, ncol=D)
     if (kernel=='gaussian') {  # gaussian filter
-        sigma=radius/3  # keep gaussian shape for every radius
         w=exp(-((row(w)-(radius+1))^2 + (col(w)-(radius+1))^2) / (2 * sigma^2))
     } else if (kernel=='spherical') {  # spherical filter
         w=1 - ((row(w)-(radius+1))^2 + (col(w)-(radius+1))^2) / (radius+1)^2        
@@ -49,7 +48,6 @@ arrayblur=function(img, radius=10, kernel='gaussian', fun='mean') {
     if (is.matrix(img)) return (matrix(as.array(rasterblur), nrow=nrow(rasterblur)))
     else return (as.array(rasterblur))  # convert back to matrix/array
 }
-
 
 solid=function(DEM, altitude=0, isnan=0) {
     # solid() calculates a solid version of a DEM
@@ -81,21 +79,39 @@ solid=function(DEM, altitude=0, isnan=0) {
 # Linear RAW development: dcraw -v -w -4 -T tiovivo.DNG
 # resized to 1280x852 px
 img=readTIFF("tiovivo.tif")^(1/2.2)  # read image and delinearize with 2.2 gamma
-hist(img, breaks=800, xlim=c(0,1), ylim=c(0,14000))
-a=median(img)  # turning point applied on median to maximize contrast split
-b=a
+med=median(img)
+
+# Custom contrast curve (a=median(img))
+a=med  # turning point applied on median to maximize contrast split
+b=a  # turning point on diagonal
 m=0.1
 E=2.5
-abline(v=a, col='red')
-
 imgcontrast=contrast(img, a, b, m, E)
-hist(imgcontrast, breaks=800, xlim=c(0,1), ylim=c(0,14000))
-acontrast=median(imgcontrast)
-paste0("Before/after median is preserved: ",
-       round(a,4), " -> ", round(acontrast,4))
-abline(v=acontrast, col='red')
-writeTIFF(imgcontrast, "tiovivocontrast.tif", bits.per.sample=16)
+medcontrast=median(imgcontrast)
+paste0("Median is preserved: ", round(med,4), " -> ", round(medcontrast,4))
+# Overlap original and output histograms
+hist(img, breaks=500, xlim=c(0,1), ylim=c(0,60000),
+     border=NA, col=rgb(0.3,0.3,0.3,0.5))
+hist(imgcontrast, breaks=500, xlim=c(0,1), ylim=c(0,60000),
+     border=NA, col=rgb(0.3,0.5,0.7,0.5), add=TRUE)
+abline(v=c(med,medcontrast), col='red')
+writeTIFF(imgcontrast, "tiovivocontrastcustom.tif", bits.per.sample=16)
 
+# Standard contrast curve (a=0.5)
+a=0.5  # standard centred turning point
+b=a  # turning point on diagonal
+m=0.1
+E=2.5
+imgcontrast=contrast(img, a, b, m, E)
+medcontrast=median(imgcontrast)
+paste0("Median is reduced: ", round(med,4), " -> ", round(medcontrast,4))
+# Overlap original and output histograms
+hist(img, breaks=500, xlim=c(0,1), ylim=c(0,60000),
+     border=NA, col=rgb(0.3,0.3,0.3,0.5))
+hist(imgcontrast, breaks=500, xlim=c(0,1), ylim=c(0,60000),
+     border=NA, col=rgb(0.3,0.5,0.7,0.5), add=TRUE)
+abline(v=c(med,medcontrast), col='red')
+writeTIFF(imgcontrast, "tiovivocontraststandard.tif", bits.per.sample=16)
 
 
 ###########################################################
@@ -161,6 +177,7 @@ writeTIFF(DEMsolid, "peninsulasolid.tif", compression='LZW')
 
 
 #################################################
+
 # 4. BASIC TONE MAPPING
 
 # Create blurred version
@@ -235,6 +252,7 @@ writeTIFF(DEMtonemap, paste0("DEMtonemap_", name, ".tif"), bits.per.sample=16)
 
 
 #################################################
+
 # 5. 3D MESHES
 
 z <- readTIFF("peninsuladem.tif")^2.2  # undo gamma 2.2
